@@ -13,7 +13,11 @@ spec:
       labels:
         app: ecommerce-api
     spec:
-      # VULN: No securityContext - runs as root
+      # FIX: Run as non-root
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: api
           image: ecommerce-api:latest
@@ -21,36 +25,39 @@ spec:
             - containerPort: 3000
           env:
             - name: DB_PASSWORD
-              value: "Pr0duction_DB_P@ssw0rd!2024"
-            - name: JWT_SECRET
-              value: "super-secret-jwt-key-2024-production"
-          # VULN: No resource limits
-          volumeMounts:
-            - name: host-volume
-              mountPath: /host-data
-            - name: docker-socket
-              mountPath: /var/run/docker.sock
-          # VULN: Privileged security context
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+          # FIX: Resource limits
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # FIX: Security context per container
           securityContext:
-            privileged: true
-            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       volumes:
-        # VULN: hostPath mount
-        - name: host-volume
-          hostPath:
-            path: /
-        - name: docker-socket
-          hostPath:
-            path: /var/run/docker.sock
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: ecommerce-api-svc
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
     - port: 3000
-      nodePort: 30080
   selector:
     app: ecommerce-api
