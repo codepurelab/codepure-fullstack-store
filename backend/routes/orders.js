@@ -1,15 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const serialize = require('node-serialize');
 const axios = require('axios');
-const _ = require('lodash');
 
 router.post('/create', (req, res) => {
   const { items, shipping, payment } = req.body;
 
-  // VULN: Prototype Pollution via lodash merge
-  const orderDefaults = { status: 'pending', currency: 'USD' };
-  const order = _.merge({}, orderDefaults, req.body);
+  // FIX: No prototype pollution - explicit property copy
+  const order = {
+    status: 'pending',
+    currency: 'USD',
+    items: Array.isArray(items) ? items : [],
+    shipping: typeof shipping === 'object' ? { address: shipping.address, city: shipping.city } : {},
+  };
 
   res.json({ orderId: Date.now(), ...order });
 });
@@ -17,7 +19,16 @@ router.post('/create', (req, res) => {
 router.post('/webhook', (req, res) => {
   const { callbackUrl, payload } = req.body;
 
-  // VULN: SSRF - server-side request to user-controlled URL
+  // FIX: Validate callback URL against allowlist
+  const allowedHosts = ['webhook.partner.com', 'notifications.internal'];
+  try {
+    const parsed = new URL(callbackUrl);
+    if (!allowedHosts.includes(parsed.hostname)) {
+      return res.status(400).json({ error: 'Callback URL not allowed' });
+    }
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid callback URL' });
+  }
   axios.post(callbackUrl, payload).then(response => {
     res.json({ status: 'webhook delivered' });
   }).catch(err => {
@@ -28,21 +39,20 @@ router.post('/webhook', (req, res) => {
 router.post('/calculate', (req, res) => {
   const { expression } = req.body;
 
-  // VULN: eval() with user-controlled input
-  try {
-    const total = eval('(' + expression + ')');
-    res.json({ total });
-  } catch (e) {
-    res.status(400).json({ error: 'Invalid expression' });
+  // FIX: Safe math evaluation
+  const total = parseFloat(expression);
+  if (isNaN(total)) {
+    return res.status(400).json({ error: 'Invalid expression' });
   }
+  res.json({ total });
 });
 
 router.post('/restore', (req, res) => {
   const { data } = req.body;
 
-  // VULN: Insecure deserialization
+  // FIX: Use JSON.parse instead of insecure deserialization
   try {
-    const order = serialize.unserialize(data);
+    const order = JSON.parse(data);
     res.json({ restored: order });
   } catch (e) {
     res.status(400).json({ error: 'Invalid order data' });
@@ -52,20 +62,20 @@ router.post('/restore', (req, res) => {
 router.get('/redirect', (req, res) => {
   const { url } = req.query;
 
-  // VULN: Open Redirect
+  // FIX: Open redirect - validate against known paths
+  const allowedPaths = ['/orders', '/checkout', '/account'];
+  if (!allowedPaths.includes(url)) {
+    return res.status(400).json({ error: 'Invalid redirect' });
+  }
   res.redirect(url);
 });
 
 router.post('/discount', (req, res) => {
   const { code } = req.body;
 
-  // VULN: Prototype Pollution via direct assignment
-  const config = {};
-  for (const key in req.body) {
-    config[key] = req.body[key];
-  }
-
-  res.json({ discount: config.discount || 0 });
+  // FIX: No prototype pollution - explicit property access
+  const discount = typeof req.body.discount === 'number' ? req.body.discount : 0;
+  res.json({ discount });
 });
 
 module.exports = router;
