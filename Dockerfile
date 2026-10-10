@@ -1,20 +1,20 @@
-# VULN: Using EOL base image
-FROM node:10
-
-# VULN: Exposing secrets in ENV
-ENV DB_PASSWORD=Pr0duction_DB_P@ssw0rd!2024
-ENV JWT_SECRET=super-secret-jwt-key-2024-production
-ENV PAYMENT_SECRET=sk_test_payment_secret_key_2024
+# FIX: Updated to current LTS base image
+FROM node:20-slim
 
 WORKDIR /app
 
-# VULN: Using ADD instead of COPY
-ADD . /app
+# FIX: Use COPY instead of ADD
+COPY backend/package.json ./
 
-# VULN: Running npm install as root
+# FIX: Run npm install as non-root build step
 RUN npm install --production
 
-# VULN: No USER directive - runs as root
-EXPOSE 3000 8080 9229
+COPY . /app
+
+# FIX: Create non-root user and switch to it
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+USER appuser
+
+EXPOSE 3000
 
 CMD ["node", "backend/server.js"]
