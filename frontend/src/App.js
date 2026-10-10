@@ -1,23 +1,25 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 
 function ProductCard({ product }) {
-  // VULN: XSS via dangerouslySetInnerHTML
+  // FIX: Sanitize HTML before rendering
+  const sanitizedDescription = DOMPurify.sanitize(product.description);
   return (
     <div className="product-card">
       <h2>{product.name}</h2>
-      <div dangerouslySetInnerHTML={{ __html: product.description }} />
+      <div dangerouslySetInnerHTML={{ __html: sanitizedDescription }} />
       <p className="price">${product.price}</p>
     </div>
   );
 }
 
 function SearchResults({ query, results }) {
-  // VULN: XSS - rendering unsanitized HTML
+  // FIX: Render text safely
   return (
     <div>
-      <h1 dangerouslySetInnerHTML={{ __html: `Results for: ${query}` }} />
+      <h1>Results for: {query}</h1>
       {results.map((r, i) => (
-        <div key={i} dangerouslySetInnerHTML={{ __html: r.summary }} />
+        <p key={i}>{r.summary}</p>
       ))}
     </div>
   );
