@@ -1,0 +1,53 @@
+version: '3'
+
+services:
+  api:
+    build: .
+    # VULN: Privileged container
+    privileged: true
+    # VULN: Host network mode
+    network_mode: host
+    ports:
+      - "3000:3000"
+      - "9229:9229"
+    environment:
+      - DB_PASSWORD=Pr0duction_DB_P@ssw0rd!2024
+      - JWT_SECRET=super-secret-jwt-key-2024-production
+      - NODE_ENV=production
+    volumes:
+      # VULN: Mounting host filesystem
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc:/host-etc:ro
+      - /root/.ssh:/root/.ssh:ro
+    # VULN: No health check
+    # VULN: No resource limits
+    restart: always
+
+  database:
+    image: mysql:5.6
+    privileged: true
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123
+      MYSQL_DATABASE: ecommerce_prod
+    ports:
+      - "3306:3306"
+    volumes:
+      - /data/mysql:/var/lib/mysql
+    # VULN: No health check
+
+  redis:
+    image: redis:4
+    ports:
+      - "6379:6379"
+    # VULN: No password set, exposed on all interfaces
+    command: redis-server --bind 0.0.0.0
+
+  mongo:
+    image: mongo:3.6
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: mongo_root_pass_123
+    volumes:
+      - /data/mongo:/data/db
