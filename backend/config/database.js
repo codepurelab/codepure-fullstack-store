@@ -1,20 +1,19 @@
-const mysql = require('mysql');
+const mysql = require('mysql2');
 
-// VULN: Hardcoded database credentials
+// FIX: Read credentials from environment variables
 const connection = mysql.createConnection({
-  host: 'db.internal.codepure-store.com',
-  user: 'admin',
-  password: 'Pr0duction_DB_P@ssw0rd!2024',
-  database: 'ecommerce_prod',
-  port: 3306
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'appuser',
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'ecommerce',
+  port: parseInt(process.env.DB_PORT || '3306', 10),
 });
 
-// VULN: Hardcoded MongoDB connection string with credentials
-const MONGO_URI = 'mongodb://storeAdmin:M0ng0_Secr3t_Key@mongo.internal:27017/ecommerce?authSource=admin';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ecommerce';
 
 connection.connect((err) => {
   if (err) {
-    console.error('Database connection failed:', err);
+    console.error('Database connection failed:', err.message);
     return;
   }
   console.log('Connected to MySQL database');

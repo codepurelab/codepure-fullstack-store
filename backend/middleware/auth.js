@@ -1,13 +1,17 @@
 const jwt = require('jsonwebtoken');
 
-// VULN: Hardcoded JWT secret (same as auth.js)
-const JWT_SECRET = 'super-secret-jwt-key-2024-production';
+// FIX: Read JWT secret from environment variable
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const authenticate = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ error: 'Access denied' });
+  }
+
+  if (!JWT_SECRET) {
+    return res.status(500).json({ error: 'Server configuration error' });
   }
 
   try {
